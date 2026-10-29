@@ -29,6 +29,8 @@ targets:
       properties:
         CFBundleDisplayName: Saver
         UILaunchScreen: {}            # شاشة إقلاع فارغة = التطبيق يملأ الشاشة
+        # النص الذي يظهر في نافذة طلب الإذن (بدونه يتوقف التطبيق فوراً)
+        NSPhotoLibraryAddUsageDescription: Saver needs permission to save downloaded videos to your Photos.
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
     scheme: {}                        # نحتاج scheme حتى يعمل xcodebuild archive

@@ -1,10 +1,12 @@
 import SwiftUI
+import UIKit
 
-// الشاشة الرئيسية: حقل للرابط + زر تحميل + شريط تقدم (المرحلة 2)
+// الشاشة الرئيسية: حقل للرابط + زر تحميل + شريط تقدم (المرحلة 3)
 struct ContentView: View {
     // @State: متغير تملكه الشاشة؛ أي تغيير فيه يعيد رسمها تلقائياً
     @State private var urlText = ""
     @State private var state: DownloadState = .idle
+    @Environment(\.openURL) private var openURL   // لفتح تطبيق الإعدادات
 
     // نحذف المسافات من البداية والنهاية قبل أي استخدام
     private var trimmedURL: String {
@@ -23,7 +25,7 @@ struct ContentView: View {
                     .onSubmit(startDownload)             // زر Go في الكيبورد
                     .padding(12)
                     .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
-                    .disabled(state.isDownloading)
+                    .disabled(state.isBusy)
 
                 // زر لصق: لا يُظهر نافذة "Allow Paste" لأن المستخدم ضغطه بنفسه
                 PasteButton(payloadType: String.self) { strings in
@@ -32,7 +34,7 @@ struct ContentView: View {
                     }
                 }
                 .buttonBorderShape(.capsule)
-                .disabled(state.isDownloading)
+                .disabled(state.isBusy)
 
                 // زر التحميل: معطّل إذا الحقل فارغ أو التحميل جارٍ
                 Button(action: startDownload) {
@@ -41,7 +43,7 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(trimmedURL.isEmpty || state.isDownloading)
+                .disabled(trimmedURL.isEmpty || state.isBusy)
 
                 statusView
 
@@ -68,10 +70,32 @@ struct ContentView: View {
             } else {
                 ProgressView("Downloading…") // دوّارة: الحجم غير معروف
             }
-        case .finished(_, let bytes):
-            Label("Downloaded \(bytes.formatted(.byteCount(style: .file)))",
+        case .saving:
+            ProgressView("Saving to Photos…")
+        case .saved(let bytes):
+            Label("Saved to Photos (\(bytes.formatted(.byteCount(style: .file))))",
                   systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
+        case .permissionDenied(let fileURL):
+            // الإذن مرفوض: نشرح ونعطي طريقاً للحل بدل رسالة خطأ فقط
+            VStack(spacing: 10) {
+                Label("Allow Saver to add videos: Settings → Saver → Photos → Add Photos Only.",
+                      systemImage: "lock.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+                HStack {
+                    Button("Open Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            openURL(url)
+                        }
+                    }
+                    Button("Try Saving Again") {
+                        save(fileURL)
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
@@ -82,7 +106,7 @@ struct ContentView: View {
 
     // ماذا يحدث عند الضغط على Download
     private func startDownload() {
-        guard !trimmedURL.isEmpty, !state.isDownloading else { return }
+        guard !trimmedURL.isEmpty, !state.isBusy else { return }
 
         let url: URL
         do {
@@ -99,11 +123,27 @@ struct ContentView: View {
                 let fileURL = try await VideoDownloader().download(from: url) { progress in
                     // التقدم يصل من خيط خلفي؛ تحديث الواجهة يجب أن يكون على الـ Main
                     Task { @MainActor in
-                        if state.isDownloading { state = .downloading(progress: progress) }
+                        if case .downloading = state { state = .downloading(progress: progress) }
                     }
                 }
-                let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int64) ?? 0
-                state = .finished(fileURL: fileURL, bytes: size)
+                save(fileURL)
+            } catch {
+                state = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
+    // الخطوة الثانية: حفظ الملف في الصور
+    private func save(_ fileURL: URL) {
+        // نقرأ الحجم قبل الحفظ لأن الملف يُحذف بعده
+        let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int64) ?? 0
+        state = .saving
+        Task {
+            do {
+                try await PhotoLibrarySaver.saveVideo(at: fileURL)
+                state = .saved(bytes: size)
+            } catch SaveError.denied {
+                state = .permissionDenied(fileURL: fileURL)
             } catch {
                 state = .failed(message: error.localizedDescription)
             }
