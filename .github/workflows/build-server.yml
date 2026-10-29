@@ -1,0 +1,70 @@
+# يبني SaverServer.exe لـ Windows (بدون الحاجة لتثبيت Python)
+name: Build Windows server
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/build-server.yml"
+  schedule:
+    - cron: "17 3 * * 1"   # كل أسبوع: نسخة جديدة فيها آخر yt-dlp
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-server
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: |
+          pip install -r backend/requirements.txt pyinstaller
+          pip install -U yt-dlp
+
+      # PyInstaller يجمع Python + المكتبات + الكود في ملف exe واحد
+      - name: Build exe
+        working-directory: backend
+        run: >
+          pyinstaller --onefile --name SaverServer
+          --collect-submodules yt_dlp
+          --collect-submodules uvicorn
+          --collect-submodules zeroconf
+          main.py
+
+      # نتأكد أن الـ exe يعمل فعلاً قبل نشره
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          $p = Start-Process backend\dist\SaverServer.exe -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            Start-Sleep -Seconds 2
+            try { Invoke-RestMethod http://127.0.0.1:8000/health; $ok = $true; break } catch {}
+          }
+          Stop-Process -Id $p.Id -Force
+          if (-not $ok) { throw "SaverServer.exe did not answer /health" }
+
+      # رابط مباشر ثابت:
+      # https://github.com/<owner>/<repo>/releases/download/server-latest/SaverServer.exe
+      - name: Publish to "server-latest" release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete server-latest --yes --cleanup-tag || true
+          gh release create server-latest backend/dist/SaverServer.exe \
+            --target "$GITHUB_SHA" \
+            --title "Windows server" \
+            --notes "Double-click SaverServer.exe. Built from ${GITHUB_SHA::7}" \
+            --prerelease

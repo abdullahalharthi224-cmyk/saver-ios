@@ -136,7 +136,9 @@ struct ContentView: View {
         // Task: نشغّل كود async من داخل زر (الزر نفسه ليس async)
         Task {
             do {
-                let videoURL = try await resolveIfNeeded(url)
+                let videoURL = try await LinkResolver.videoURL(for: url, manualAddress: serverAddress) {
+                    state = .resolving
+                }
                 state = .downloading(progress: nil)
                 let fileURL = try await VideoDownloader().download(from: videoURL) { progress in
                     // التقدم يصل من خيط خلفي؛ تحديث الواجهة يجب أن يكون على الـ Main
@@ -151,18 +153,7 @@ struct ContentView: View {
         }
     }
 
-    // الخطوة الأولى: إذا كان الرابط صفحة (مثل TikTok) نطلب من الخادم تجهيز الفيديو
-    private func resolveIfNeeded(_ url: URL) async throws -> URL {
-        // رابط فيديو مباشر، أو لا يوجد خادم: نحمّل مباشرة كما في المرحلة 2
-        if VideoDownloader.isDirectVideo(url) || serverAddress.isEmpty {
-            return url
-        }
-        state = .resolving
-        let client = try ResolverClient(address: serverAddress)
-        return try await client.resolve(url).videoURL
-    }
-
-    // الخطوة الثالثة: حفظ الملف في الصور
+    // الخطوة الأخيرة: حفظ الملف في الصور
     private func save(_ fileURL: URL) {
         // نقرأ الحجم قبل الحفظ لأن الملف يُحذف بعده
         let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int64) ?? 0

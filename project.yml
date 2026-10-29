@@ -36,6 +36,8 @@ targets:
         NSLocalNetworkUsageDescription: Saver connects to the server on your PC to prepare videos.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true   # يسمح بـ http داخل الشبكة المحلية فقط
+        NSBonjourServices:              # نوع الخدمة التي نبحث عنها في الشبكة
+          - _saver._tcp
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
     dependencies:
@@ -61,6 +63,11 @@ targets:
       properties:
         CFBundleDisplayName: Saver
         NSPhotoLibraryAddUsageDescription: Saver needs permission to save downloaded videos to your Photos.
+        NSLocalNetworkUsageDescription: Saver connects to the server on your PC to prepare videos.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSBonjourServices:
+          - _saver._tcp
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: ShareViewController   # الكلاس الذي يبدأ منه iOS

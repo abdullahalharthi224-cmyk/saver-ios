@@ -36,8 +36,10 @@ struct ShareView: View {
     @ViewBuilder
     private var statusView: some View {
         switch state {
-        case .idle, .resolving:
+        case .idle:
             ProgressView()
+        case .resolving:
+            ProgressView("Preparing video on your PC…")
         case .downloading(let progress):
             if let progress {
                 ProgressView(value: progress) {
@@ -78,8 +80,12 @@ struct ShareView: View {
 
         do {
             let validURL = try VideoDownloader.validatedURL(from: shared.absoluteString)
+            // الـ extension لا يقرأ إعدادات التطبيق، لكنه يجد الخادم تلقائياً (Bonjour)
+            let videoURL = try await LinkResolver.videoURL(for: validURL, manualAddress: "") {
+                state = .resolving
+            }
             state = .downloading(progress: nil)
-            let fileURL = try await VideoDownloader().download(from: validURL) { progress in
+            let fileURL = try await VideoDownloader().download(from: videoURL) { progress in
                 Task { @MainActor in
                     if case .downloading = state { state = .downloading(progress: progress) }
                 }

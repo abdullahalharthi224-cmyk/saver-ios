@@ -18,7 +18,7 @@ struct ServerSettingsView: View {
                 } header: {
                     Text("PC Server Address")
                 } footer: {
-                    Text("Start run.bat on your PC and type the address it shows. Leave empty to use direct video links only.")
+                    Text("Leave empty: Saver finds your PC by itself. Type an address only if automatic search fails.")
                 }
 
                 Section {
@@ -26,12 +26,12 @@ struct ServerSettingsView: View {
                         Task { await testConnection() }
                     } label: {
                         HStack {
-                            Text("Test Connection")
+                            Text(address.isEmpty ? "Search for My PC" : "Test Connection")
                             Spacer()
                             if isTesting { ProgressView() }
                         }
                     }
-                    .disabled(address.isEmpty || isTesting)
+                    .disabled(isTesting)
 
                     if let testResult {
                         Text(testResult).font(.footnote)
@@ -52,8 +52,17 @@ struct ServerSettingsView: View {
         isTesting = true
         defer { isTesting = false }   // defer: يُنفّذ عند الخروج من الدالة مهما حدث
         do {
-            let version = try await ResolverClient(address: address).health()
-            testResult = "✅ Connected (yt-dlp \(version))"
+            // بدون عنوان: نبحث تلقائياً كما يفعل التطبيق عند التحميل
+            var target = address
+            if target.isEmpty {
+                guard let found = await ServerDiscovery.find() else {
+                    testResult = "❌ No PC found. Is SaverServer running on the same Wi-Fi?"
+                    return
+                }
+                target = found
+            }
+            let version = try await ResolverClient(address: target).health()
+            testResult = "✅ Connected to \(target) (yt-dlp \(version))"
         } catch {
             testResult = "❌ \(error.localizedDescription)"
         }

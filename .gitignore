@@ -75,3 +75,6 @@ SaverShare/Info.plist
 backend/.venv/
 backend/downloads/
 __pycache__/
+backend/build/
+backend/dist/
+backend/*.spec
