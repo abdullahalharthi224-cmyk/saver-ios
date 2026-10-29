@@ -5,6 +5,15 @@ on:
   push:
   workflow_dispatch:   # زر "Run workflow" للتشغيل اليدوي
 
+# صلاحية الكتابة لازمة لإنشاء Release ورفع الملف عليه
+permissions:
+  contents: write
+
+# لو صار push مرتين بسرعة، لا يتسابق بناءان على نفس الـ Release
+concurrency:
+  group: build-ipa
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-latest
@@ -41,3 +50,17 @@ jobs:
         with:
           name: Saver-ipa
           path: Saver.ipa
+
+      # رابط مباشر ثابت للـ IPA (بدون zip):
+      # https://github.com/<owner>/<repo>/releases/download/latest/Saver.ipa
+      - name: Publish to "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # نحذف الإصدار القديم ونصنع جديداً يشير إلى هذا الـ commit
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest Saver.ipa \
+            --target "$GITHUB_SHA" \
+            --title "Latest build" \
+            --notes "Built from ${GITHUB_SHA::7}" \
+            --prerelease
