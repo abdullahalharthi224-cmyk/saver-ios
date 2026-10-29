@@ -1,0 +1,43 @@
+# يبني IPA غير موقّع على جهاز Mac في GitHub في كل push
+name: Build unsigned IPA
+
+on:
+  push:
+  workflow_dispatch:   # زر "Run workflow" للتشغيل اليدوي
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Archive (no signing)
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Saver.xcodeproj \
+            -scheme Saver \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Saver.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Saver.xcarchive/Products/Applications/Saver.app Payload/
+          zip -qry Saver.ipa Payload
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Saver-ipa
+          path: Saver.ipa
