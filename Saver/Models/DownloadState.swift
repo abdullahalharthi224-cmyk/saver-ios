@@ -3,6 +3,7 @@ import Foundation
 // حالة الشاشة: قيمة واحدة فقط في كل لحظة
 enum DownloadState: Equatable {
     case idle                                   // لا شيء يحدث
+    case resolving                              // الخادم على جهازك يجهّز الفيديو
     case downloading(progress: Double?)         // nil = الحجم غير معروف بعد
     case saving                                 // نحفظ في الصور
     case saved(bytes: Int64)                    // تم الحفظ في الصور
@@ -12,7 +13,7 @@ enum DownloadState: Equatable {
     // هل هناك عمل جارٍ؟ (نعطّل الأزرار وقتها)
     var isBusy: Bool {
         switch self {
-        case .downloading, .saving: return true
+        case .resolving, .downloading, .saving: return true
         default: return false
         }
     }

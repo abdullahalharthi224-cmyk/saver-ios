@@ -1,12 +1,15 @@
 import SwiftUI
 import UIKit
 
-// الشاشة الرئيسية: حقل للرابط + زر تحميل + شريط تقدم (المرحلة 3)
+// الشاشة الرئيسية: حقل للرابط + زر تحميل + شريط تقدم (المرحلة 5)
 struct ContentView: View {
     // @State: متغير تملكه الشاشة؛ أي تغيير فيه يعيد رسمها تلقائياً
     @State private var urlText = ""
     @State private var state: DownloadState = .idle
     @Environment(\.openURL) private var openURL   // لفتح تطبيق الإعدادات
+    // @AppStorage: مثل @State لكنه يُحفظ في الجهاز ويبقى بعد إغلاق التطبيق
+    @AppStorage("serverAddress") private var serverAddress = ""
+    @State private var showServerSettings = false
 
     // نحذف المسافات من البداية والنهاية قبل أي استخدام
     private var trimmedURL: String {
@@ -51,6 +54,17 @@ struct ContentView: View {
             }
             .padding()
             .navigationTitle("Saver")
+            .toolbar {
+                Button {
+                    showServerSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .accessibilityLabel("Server Settings")
+            }
+            .sheet(isPresented: $showServerSettings) {
+                ServerSettingsView(address: $serverAddress)
+            }
         }
     }
 
@@ -60,6 +74,8 @@ struct ContentView: View {
         switch state {
         case .idle:
             EmptyView()
+        case .resolving:
+            ProgressView("Preparing video on your PC…")
         case .downloading(let progress):
             if let progress {
                 ProgressView(value: progress) {
@@ -120,7 +136,9 @@ struct ContentView: View {
         // Task: نشغّل كود async من داخل زر (الزر نفسه ليس async)
         Task {
             do {
-                let fileURL = try await VideoDownloader().download(from: url) { progress in
+                let videoURL = try await resolveIfNeeded(url)
+                state = .downloading(progress: nil)
+                let fileURL = try await VideoDownloader().download(from: videoURL) { progress in
                     // التقدم يصل من خيط خلفي؛ تحديث الواجهة يجب أن يكون على الـ Main
                     Task { @MainActor in
                         if case .downloading = state { state = .downloading(progress: progress) }
@@ -133,7 +151,18 @@ struct ContentView: View {
         }
     }
 
-    // الخطوة الثانية: حفظ الملف في الصور
+    // الخطوة الأولى: إذا كان الرابط صفحة (مثل TikTok) نطلب من الخادم تجهيز الفيديو
+    private func resolveIfNeeded(_ url: URL) async throws -> URL {
+        // رابط فيديو مباشر، أو لا يوجد خادم: نحمّل مباشرة كما في المرحلة 2
+        if VideoDownloader.isDirectVideo(url) || serverAddress.isEmpty {
+            return url
+        }
+        state = .resolving
+        let client = try ResolverClient(address: serverAddress)
+        return try await client.resolve(url).videoURL
+    }
+
+    // الخطوة الثالثة: حفظ الملف في الصور
     private func save(_ fileURL: URL) {
         // نقرأ الحجم قبل الحفظ لأن الملف يُحذف بعده
         let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int64) ?? 0

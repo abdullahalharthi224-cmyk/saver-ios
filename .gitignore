@@ -70,3 +70,8 @@ build/
 DerivedData/
 Payload/
 SaverShare/Info.plist
+
+# Backend
+backend/.venv/
+backend/downloads/
+__pycache__/

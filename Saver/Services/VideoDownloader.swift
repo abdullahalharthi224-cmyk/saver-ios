@@ -15,7 +15,7 @@ enum DownloadError: LocalizedError {
         case .noInternet:
             return "No internet connection. Check Wi-Fi or cellular data."
         case .notAVideo(let type):
-            return "This link is not a video file (type: \(type ?? "unknown"))."
+            return "This link is not a video file (type: \(type ?? "unknown")). For web pages, set up your PC server in Saver ⚙️."
         case .badStatus(let code):
             return "The server refused the download (HTTP \(code))."
         case .other(let message):
@@ -42,6 +42,11 @@ final class VideoDownloader: NSObject, URLSessionDownloadDelegate {
             throw DownloadError.invalidURL
         }
         return url
+    }
+
+    // هل الرابط ملف فيديو مباشر؟ (نعرف من الامتداد)
+    static func isDirectVideo(_ url: URL) -> Bool {
+        ["mp4", "mov", "m4v"].contains(url.pathExtension.lowercased())
     }
 
     // يبدأ التحميل وينتظر حتى ينتهي، ثم يرجع مكان الملف على الجهاز

@@ -36,7 +36,7 @@ struct ShareView: View {
     @ViewBuilder
     private var statusView: some View {
         switch state {
-        case .idle:
+        case .idle, .resolving:
             ProgressView()
         case .downloading(let progress):
             if let progress {

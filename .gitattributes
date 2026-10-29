@@ -1,0 +1,2 @@
+# ملفات Windows .bat تحتاج نهايات أسطر CRLF
+*.bat text eol=crlf

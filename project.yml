@@ -32,6 +32,10 @@ targets:
         UILaunchStoryboardName: LaunchScreen
         # النص الذي يظهر في نافذة طلب الإذن (بدونه يتوقف التطبيق فوراً)
         NSPhotoLibraryAddUsageDescription: Saver needs permission to save downloaded videos to your Photos.
+        # المرحلة 5: الاتصال بالخادم على جهازك داخل شبكة البيت
+        NSLocalNetworkUsageDescription: Saver connects to the server on your PC to prepare videos.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true   # يسمح بـ http داخل الشبكة المحلية فقط
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
     dependencies:
